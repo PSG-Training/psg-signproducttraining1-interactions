@@ -111,6 +111,9 @@
   .opt.locked{cursor:default;}
 
   /* ---------- feedback ---------- */
+  .response{
+    min-height:186px;   /* reserves room so the page never shifts */
+  }
   .feedback{
     display:none;
     border-left:6px solid var(--psg-blue);
@@ -152,6 +155,7 @@
   @media (max-width:520px){
     body{padding:14px;}
     .opt img{height:150px;}
+    .response{min-height:250px;}
   }
 </style>
 </head>
@@ -165,13 +169,15 @@
 
   <div class="options" id="options" role="group" aria-labelledby="q-prompt"></div>
 
-  <div class="feedback" id="feedback" role="status" aria-live="polite">
-    <span class="verdict" id="verdict"></span>
-    <span id="explain"></span>
-  </div>
+  <div class="response">
+    <div class="feedback" id="feedback" role="status" aria-live="polite">
+      <span class="verdict" id="verdict"></span>
+      <span id="explain"></span>
+    </div>
 
-  <div class="actions" id="actions">
-    <button class="retry" id="retry" type="button">Try again</button>
+    <div class="actions" id="actions">
+      <button class="retry" id="retry" type="button">Try again</button>
+    </div>
   </div>
 
 </div>
@@ -270,7 +276,7 @@ const QUESTION = {
     explain.textContent = opt.feedback;
     fb.className = "feedback show " + (opt.correct ? "correct" : "incorrect");
     actions.className = opt.correct ? "actions" : "actions show";
-    if (!opt.correct) retryBtn.focus();
+    if (!opt.correct) retryBtn.focus({ preventScroll: true });
   }
 
   function reset(refocus) {
@@ -280,7 +286,7 @@ const QUESTION = {
     });
     fb.className = "feedback";
     actions.className = "actions";
-    if (refocus === true) cards[0].focus();
+    if (refocus === true) cards[0].focus({ preventScroll: true });
   }
 
   retryBtn.addEventListener("click", function () { reset(true); });
