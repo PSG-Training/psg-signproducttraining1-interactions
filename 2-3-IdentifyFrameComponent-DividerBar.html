@@ -188,7 +188,27 @@
      height, so everything still fits in a short frame.
      ============================================================ */
   @media (max-width:700px){
-    .wrap{padding:10px 10px;gap:8px;}
+    .wrap{padding:10px 10px;gap:8px;position:relative;}
+
+    /* The Trainual mobile app clips the frame and will not scroll
+       inside it. So feedback is pinned to the TOP, where it is
+       always visible, instead of sitting below the images. */
+    .response{
+      position:absolute;
+      top:0;left:0;right:0;
+      margin:0;
+      padding:10px;
+      min-height:0;
+      z-index:5;
+      background:transparent;
+      pointer-events:none;
+    }
+    .response.active{
+      background:var(--page-bg);
+      pointer-events:auto;
+      box-shadow:0 6px 16px rgba(12,35,64,.14);
+      border-radius:0 0 10px 10px;
+    }
     .options{
       grid-template-columns:repeat(3,1fr);
       gap:6px;
@@ -197,7 +217,6 @@
     .opt{padding:5px;border-width:2px;border-radius:8px;gap:3px;}
     .opt .label{font-size:9px;letter-spacing:.02em;}
     .rule{margin-bottom:6px;}
-    .response{min-height:104px;gap:8px;}
     .feedback{font-size:13px;line-height:1.35;padding:8px 10px;border-left-width:5px;}
   }
 </style>
@@ -321,6 +340,7 @@ const QUESTION = {
     explain.textContent = opt.feedback;
     fb.className = "feedback show " + (opt.correct ? "correct" : "incorrect");
     actions.className = opt.correct ? "actions" : "actions show";
+    document.querySelector(".response").classList.add("active");
     if (!opt.correct) retryBtn.focus({ preventScroll: true });
   }
 
@@ -329,6 +349,7 @@ const QUESTION = {
     cards.forEach(function (c) { c.className = "opt"; });
     fb.className = "feedback";
     actions.className = "actions";
+    document.querySelector(".response").classList.remove("active");
     if (refocus === true) cards[0].focus({ preventScroll: true });
   }
 
