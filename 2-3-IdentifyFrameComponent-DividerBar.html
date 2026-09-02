@@ -85,7 +85,9 @@
   /* ---------- option row: absorbs leftover space ---------- */
   .options{
     flex:1 1 auto;
-    min-height:0;              /* lets it actually shrink */
+    /* Hard floor: the row may shrink, but never below this. If the
+       frame is too short to honour it, .wrap scrolls instead. */
+    min-height:150px;
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
     gap:clamp(8px,1.4vw,18px);
@@ -179,6 +181,25 @@
   }
   button.retry:hover{background:#066890;}
   button.retry:focus-visible{outline:3px solid var(--psg-navy);outline-offset:2px;}
+
+  /* ============================================================
+     NARROW SCREENS (phones, Trainual mobile app)
+     Three across instead of stacked. Roughly a third of the
+     height, so everything still fits in a short frame.
+     ============================================================ */
+  @media (max-width:700px){
+    .wrap{padding:10px 10px;gap:8px;}
+    .options{
+      grid-template-columns:repeat(3,1fr);
+      gap:6px;
+      min-height:118px;
+    }
+    .opt{padding:5px;border-width:2px;border-radius:8px;gap:3px;}
+    .opt .label{font-size:9px;letter-spacing:.02em;}
+    .rule{margin-bottom:6px;}
+    .response{min-height:104px;gap:8px;}
+    .feedback{font-size:13px;line-height:1.35;padding:8px 10px;border-left-width:5px;}
+  }
 </style>
 </head>
 <body>
