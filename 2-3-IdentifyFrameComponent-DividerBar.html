@@ -188,7 +188,11 @@
      height, so everything still fits in a short frame.
      ============================================================ */
   @media (max-width:700px){
-    .wrap{padding:10px 10px;gap:8px;position:relative;}
+    /* The Trainual mobile app clips the frame near 450px. Cap our own
+       layout below that so content is never laid out into space the
+       learner will not be shown. Any extra frame height is left empty
+       and clipped harmlessly. */
+    .wrap{padding:10px 10px;gap:8px;position:relative;max-height:430px;}
 
     /* The Trainual mobile app clips the frame and will not scroll
        inside it. So feedback is pinned to the TOP, where it is
