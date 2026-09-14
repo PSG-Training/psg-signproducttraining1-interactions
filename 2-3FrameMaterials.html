@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sort It: Steel or Aluminum?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     PSG BRAND TOKENS
+     ============================================================ */
+  :root{
+    --psg-blue:#077CAB;
+    --psg-navy:#0C2340;
+    --card-gray:#EAEAEA;
+    --page-bg:#F5F5F5;
+    --white:#FFFFFF;
+    --correct:#1F7A3D;
+    --incorrect:#B3261E;
+    --font-head:"Montserrat","Segoe UI",Arial,sans-serif;
+    --font-body:"Source Sans 3","Segoe UI",Arial,sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+
+  /* ============================================================
+     FIT-TO-HEIGHT LAYOUT
+     The page fills exactly the height it is given and never more.
+     Header, feedback and button are fixed size; the two sorting
+     bins absorb whatever space is left over.
+     ============================================================ */
+  html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+  body{
+    background:var(--page-bg);
+    font-family:var(--font-body);
+    color:var(--psg-navy);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    height:100%;
+    max-width:1100px;
+    margin:0 auto;
+    padding:clamp(10px,2.2vh,22px) clamp(12px,2vw,24px);
+    display:flex;
+    flex-direction:column;
+    gap:clamp(6px,1.2vh,14px);
+    min-height:0;
+    overflow:auto;   /* safety net only; normally nothing scrolls */
+  }
+
+  /* ---------- header block: fixed size ---------- */
+  .head{flex:0 0 auto;}
+  h1{
+    font-family:var(--font-head);
+    font-weight:700;
+    color:var(--psg-navy);
+    font-size:clamp(15px,min(2.8vw,3.8vh),28px);
+    line-height:1.15;
+    margin:0 0 5px;
+  }
+  .rule{
+    height:4px;background:var(--psg-blue);
+    width:58px;border-radius:2px;margin:0 0 clamp(6px,1.4vh,14px);
+  }
+  .prompt{
+    font-family:var(--font-head);
+    font-weight:600;
+    font-size:clamp(15px,min(2.2vw,3vh),22px);
+    line-height:1.3;
+    margin:0 0 3px;
+    max-width:70ch;
+  }
+  .hint{
+    font-size:clamp(11px,min(1.4vw,1.9vh),14px);
+    color:#5A6B7D;
+    margin:0;
+  }
+
+  /* ---------- sorting bins: absorb leftover space ---------- */
+  .options{
+    flex:1 1 auto;
+    /* Hard floor: the row may shrink, but never below this. */
+    min-height:150px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:clamp(8px,1.4vw,18px);
+    align-content:stretch;
+  }
+  .opt{
+    background:var(--white);
+    border:3px solid var(--card-gray);
+    border-radius:10px;
+    padding:clamp(6px,1.2vh,14px);
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    min-height:0;
+    overflow:hidden;
+    font-family:var(--font-head);
+    color:var(--psg-navy);
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .opt:hover:not(.locked){
+    border-color:var(--psg-blue);
+    box-shadow:0 4px 14px rgba(12,35,64,.12);
+  }
+  .opt:focus-visible{outline:3px solid var(--psg-blue);outline-offset:3px;}
+  .opt .bin{
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    font-size:clamp(15px,min(2.4vw,3.2vh),26px);
+    line-height:1.1;
+  }
+  .opt .sub{
+    font-family:var(--font-body);
+    font-weight:400;
+    font-size:clamp(10px,min(1.2vw,1.7vh),13px);
+    color:#5A6B7D;
+    text-align:center;
+  }
+
+  .opt.chosen-correct{border-color:var(--correct);background:#F1F8F3;}
+  .opt.chosen-incorrect{border-color:var(--incorrect);background:#FDF3F2;}
+  .opt.dimmed{opacity:.45;}
+  .opt.locked{cursor:default;}
+
+  /* ---------- progress dots ---------- */
+  .progress{
+    flex:0 0 auto;
+    display:flex;
+    gap:5px;
+    align-items:center;
+  }
+  .dot{
+    width:clamp(8px,1.1vh,12px);
+    height:clamp(8px,1.1vh,12px);
+    border-radius:50%;
+    background:var(--card-gray);
+    border:1px solid #D2D2D2;
+  }
+  .dot.correct{background:var(--correct);border-color:var(--correct);}
+  .dot.incorrect{background:var(--incorrect);border-color:var(--incorrect);}
+
+  /* ---------- response block: fixed size, always reserved ---------- */
+  .response{
+    flex:0 0 auto;
+    display:flex;
+    flex-direction:column;
+    gap:clamp(6px,1.2vh,14px);
+    min-height:clamp(96px,20vh,168px);
+  }
+  .feedback{
+    visibility:hidden;
+    border-left:6px solid var(--psg-blue);
+    background:var(--card-gray);
+    border-radius:6px;
+    padding:clamp(8px,1.4vh,16px) clamp(10px,1.4vw,18px);
+    font-size:clamp(13px,min(1.8vw,2.4vh),18px);
+    line-height:1.45;
+  }
+  .feedback.show{visibility:visible;}
+  .feedback .verdict{
+    font-family:var(--font-head);
+    font-weight:700;
+    display:block;
+    margin-bottom:2px;
+    font-size:1.05em;
+  }
+  .feedback.correct{border-left-color:var(--correct);}
+  .feedback.correct .verdict{color:var(--correct);}
+  .feedback.incorrect{border-left-color:var(--incorrect);}
+  .feedback.incorrect .verdict{color:var(--incorrect);}
+
+  .actions{visibility:hidden;flex:0 0 auto;}
+  .actions.show{visibility:visible;}
+  button.retry{
+    font-family:var(--font-head);
+    font-weight:600;
+    font-size:clamp(13px,min(1.5vw,2vh),15px);
+    color:var(--white);
+    background:var(--psg-blue);
+    border:none;
+    border-radius:6px;
+    padding:clamp(7px,1.2vh,11px) clamp(14px,1.8vw,22px);
+    cursor:pointer;
+  }
+  button.retry:hover{background:#066890;}
+  button.retry:focus-visible{outline:3px solid var(--psg-navy);outline-offset:2px;}
+
+  /* ============================================================
+     NARROW SCREENS (phones, Trainual mobile app)
+     ============================================================ */
+  @media (max-width:700px){
+    /* The app clips the frame near 450px. Cap our own layout below
+       that so content is never placed where it cannot be seen. */
+    .wrap{padding:10px 10px;gap:8px;position:relative;max-height:430px;}
+
+    /* Feedback is pinned to the TOP, where it is always visible,
+       instead of sitting below the bins. */
+    .response{
+      position:absolute;
+      top:0;left:0;right:0;
+      margin:0;
+      padding:10px;
+      min-height:0;
+      z-index:5;
+      background:transparent;
+      pointer-events:none;
+    }
+    .response.active{
+      background:var(--page-bg);
+      pointer-events:auto;
+      box-shadow:0 6px 16px rgba(12,35,64,.14);
+      border-radius:0 0 10px 10px;
+    }
+    .options{gap:8px;min-height:118px;}
+    .opt{padding:6px;border-width:2px;border-radius:8px;gap:2px;}
+    .opt .sub{font-size:10px;}
+    .rule{margin-bottom:6px;}
+    .feedback{font-size:13px;line-height:1.35;padding:8px 10px;border-left-width:5px;}
+    .dot{width:8px;height:8px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1 id="q-title"></h1>
+    <div class="rule"></div>
+    <p class="prompt" id="q-prompt"></p>
+    <p class="hint" id="q-hint"></p>
+  </div>
+
+  <div class="options" id="options" role="group" aria-labelledby="q-prompt"></div>
+
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
+  <div class="response">
+    <div class="feedback" id="feedback" role="status" aria-live="polite">
+      <span class="verdict" id="verdict"></span>
+      <span id="explain"></span>
+    </div>
+    <div class="actions" id="actions">
+      <button class="retry" id="retry" type="button">Next</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================================================================
+   EDIT BELOW THIS LINE TO CHANGE THE ACTIVITY
+   ----------------------------------------------------------------
+   title    - heading at the top of the page
+   bins     - the two sorting buckets. "id" must match each item's
+              "answer" value.
+   items    - one per round. "text" is the trait the learner sorts.
+              "feedback" is what they see after answering, whether
+              they got it right or wrong. Keep it to about two lines.
+   ================================================================ */
+const ACTIVITY = {
+  title: "Sort It: Steel or Aluminum?",
+  bins: [
+    { id: "steel",    name: "Steel Frames" },
+    { id: "aluminum", name: "Aluminum Frames"}
+  ],
+  items: [
+    {
+      text: "Stronger and sturdier",
+      answer: "steel",
+      feedback: "Steel carries more load, so it is the usual pick for large or tall frames. Aluminum is the weaker of the two."
+    },
+    {
+      text: "Lighter weight",
+      answer: "aluminum",
+      feedback: "Aluminum weighs less, which makes handling and hanging easier. Steel is the heavier material."
+    },
+    {
+      text: "Must be sanded and primed before painting",
+      answer: "steel",
+      feedback: "Steel needs that extra prep before paint. Skipping it invites rust later."
+    },
+    {
+      text: "Can be extruded into the desired shape",
+      answer: "aluminum",
+      feedback: "Aluminum is more malleable, so it can be extruded into custom shapes. Steel does not offer that."
+    },
+    {
+      text: "Typically less expensive material cost",
+      answer: "steel",
+      feedback: "Steel usually costs less per pound and is more readily available."
+    },
+    {
+      text: "Does not corrode",
+      answer: "aluminum",
+      feedback: "Aluminum resists corrosion, which is why it is favored in coastal jobs."
+    },
+    {
+      text: "Can be welded in the field",
+      answer: "steel",
+      feedback: "Welding steel is routine. Aluminum needs more specialized welding."
+    },
+    {
+      text: "Cannot be welded to steel structural supports",
+      answer: "aluminum",
+      feedback: "Aluminum reacts with steel, so it cannot easily be welded to steel supports. That reaction is not a concern steel-to-steel."
+    },
+    {
+      text: "Risk of corrosion in coastal areas",
+      answer: "steel",
+      feedback: "Salt air is hard on steel. When a job sits near the coast, zinc coated steel (either galvanized or galvannealed) is used as it is more resistant to corrosion."
+    },
+    {
+      text: "Requires more specialized welding",
+      answer: "aluminum",
+      feedback: "Aluminum welding takes special equipment to weld."
+    }
+  ],
+  correctVerdicts:   ["Correct.", "That's it.", "Right.", "Nice work.", "Yes."],
+  incorrectVerdicts: ["Not quite.", "Other way around.", "Close, but no.", "Try the other bin.", "Not this time."],
+  hint: "Tap the material this describes.",
+  closingHint: "You reached the end of the set."
+};
+/* ================================================================
+   NO EDITS NEEDED BELOW THIS LINE
+   ================================================================ */
+
+(function () {
+  const grid     = document.getElementById("options");
+  const fb       = document.getElementById("feedback");
+  const verdict  = document.getElementById("verdict");
+  const explain  = document.getElementById("explain");
+  const actions  = document.getElementById("actions");
+  const retryBtn = document.getElementById("retry");
+  const prompt   = document.getElementById("q-prompt");
+  const hint     = document.getElementById("q-hint");
+  const progress = document.getElementById("progress");
+  const response = document.querySelector(".response");
+
+  document.getElementById("q-title").textContent = ACTIVITY.title;
+  document.title = ACTIVITY.title;
+
+  const total = ACTIVITY.items.length;
+  let index = 0;
+  let score = 0;
+  let results = [];
+  let cards = [];
+
+  // progress dots
+  const dots = ACTIVITY.items.map(function () {
+    const d = document.createElement("span");
+    d.className = "dot";
+    progress.appendChild(d);
+    return d;
+  });
+
+  function buildBins() {
+    grid.innerHTML = "";
+    cards = ACTIVITY.bins.map(function (bin) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.setAttribute("aria-label", "Sort into " + bin.name);
+
+      const name = document.createElement("span");
+      name.className = "bin";
+      name.textContent = bin.name;
+      b.appendChild(name);
+
+      if (bin.sub) {
+        const sub = document.createElement("span");
+        sub.className = "sub";
+        sub.textContent = bin.sub;
+        b.appendChild(sub);
+      }
+
+      b.addEventListener("click", function () { choose(bin.id); });
+      grid.appendChild(b);
+      return b;
+    });
+  }
+
+  function pick(list, i) { return list[i % list.length]; }
+
+  function showItem() {
+    const item = ACTIVITY.items[index];
+    prompt.textContent = item.text;
+    hint.textContent = "Item " + (index + 1) + " of " + total + " \u2014 " + ACTIVITY.hint;
+    grid.dataset.locked = "0";
+    cards.forEach(function (c) { c.className = "opt"; });
+    fb.className = "feedback";
+    actions.className = "actions";
+    response.classList.remove("active");
+  }
+
+  function choose(binId) {
+    if (grid.dataset.locked === "1") return;
+    const item = ACTIVITY.items[index];
+    const right = binId === item.answer;
+    grid.dataset.locked = "1";
+
+    cards.forEach(function (c, j) {
+      c.classList.add("locked");
+      if (ACTIVITY.bins[j].id === binId) {
+        c.classList.add(right ? "chosen-correct" : "chosen-incorrect");
+      } else {
+        c.classList.add("dimmed");
+      }
+    });
+
+    results[index] = right;
+    dots[index].className = "dot " + (right ? "correct" : "incorrect");
+    if (right) score++;
+
+    verdict.textContent = right
+      ? pick(ACTIVITY.correctVerdicts, index)
+      : pick(ACTIVITY.incorrectVerdicts, index);
+    explain.textContent = item.feedback;
+    fb.className = "feedback show " + (right ? "correct" : "incorrect");
+    retryBtn.textContent = (index + 1 < total) ? "Next" : "See results";
+    actions.className = "actions show";
+    response.classList.add("active");
+    retryBtn.focus({ preventScroll: true });
+  }
+
+  function showSummary() {
+    prompt.textContent = "You sorted " + score + " of " + total + " correctly.";
+    hint.textContent = ACTIVITY.closingHint;
+    grid.innerHTML = "";
+    cards = [];
+
+    const again = document.createElement("button");
+    again.type = "button";
+    again.className = "opt";
+    const name = document.createElement("span");
+    name.className = "bin";
+    name.textContent = "Start over";
+    again.appendChild(name);
+    const sub = document.createElement("span");
+    sub.className = "sub";
+    sub.textContent = "Run the set again";
+    again.appendChild(sub);
+    again.addEventListener("click", restart);
+    grid.style.gridTemplateColumns = "1fr";
+    grid.appendChild(again);
+
+    fb.className = "feedback";
+    actions.className = "actions";
+    response.classList.remove("active");
+    again.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    index = 0;
+    score = 0;
+    results = [];
+    dots.forEach(function (d) { d.className = "dot"; });
+    grid.style.gridTemplateColumns = "";
+    buildBins();
+    showItem();
+    cards[0].focus({ preventScroll: true });
+  }
+
+  retryBtn.addEventListener("click", function () {
+    if (index + 1 < total) {
+      index++;
+      showItem();
+      cards[0].focus({ preventScroll: true });
+    } else {
+      showSummary();
+    }
+  });
+
+  buildBins();
+  showItem();
+})();
+</script>
+</body>
+</html>
