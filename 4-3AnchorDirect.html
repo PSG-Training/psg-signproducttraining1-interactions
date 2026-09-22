@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anchor Bolts vs. Direct Bury</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     PSG BRAND TOKENS
+     ============================================================ */
+  :root{
+    --psg-blue:#077CAB;
+    --psg-navy:#0C2340;
+    --card-gray:#EAEAEA;
+    --page-bg:#F5F5F5;
+    --white:#FFFFFF;
+    --correct:#1F7A3D;
+    --incorrect:#B3261E;
+    --font-head:"Montserrat","Segoe UI",Arial,sans-serif;
+    --font-body:"Source Sans 3","Segoe UI",Arial,sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+
+  /* ============================================================
+     FIT-TO-HEIGHT LAYOUT
+     The page fills exactly the height it is given and never more.
+     Heading, answer controls and the response slot are fixed size;
+     the stage in the middle absorbs whatever is left over.
+     ============================================================ */
+  html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+  body{
+    background:var(--page-bg);
+    font-family:var(--font-body);
+    color:var(--psg-navy);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    height:100%;
+    max-width:1100px;
+    margin:0 auto;
+    padding:clamp(10px,2.2vh,22px) clamp(12px,2vw,24px);
+    display:flex;
+    flex-direction:column;
+    gap:clamp(6px,1.2vh,14px);
+    min-height:0;
+    overflow:auto;   /* safety net only; normally nothing scrolls */
+  }
+
+  /* ---------- header block: fixed size ---------- */
+  .head{flex:0 0 auto;}
+  h1{
+    font-family:var(--font-head);
+    font-weight:700;
+    color:var(--psg-navy);
+    font-size:clamp(16px,min(3vw,4.2vh),30px);
+    line-height:1.15;
+    margin:0 0 5px;
+  }
+  .rule{
+    height:4px;background:var(--psg-blue);
+    width:58px;border-radius:2px;margin:0 0 clamp(5px,1.2vh,12px);
+  }
+  .progress{
+    font-family:var(--font-head);
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    font-size:clamp(10px,min(1.2vw,1.7vh),12px);
+    color:#5A6B7D;
+    margin:0 0 3px;
+  }
+  .prompt{
+    font-size:clamp(14px,min(2vw,2.7vh),20px);
+    line-height:1.4;
+    margin:0 0 3px;
+    max-width:70ch;
+  }
+  .hint{
+    font-size:clamp(11px,min(1.4vw,1.9vh),14px);
+    color:#5A6B7D;
+    margin:0;
+  }
+
+  /* ============================================================
+     STAGES
+     Only one stage is mounted at a time. Whichever is showing is
+     the single flexible region that soaks up leftover height.
+     ============================================================ */
+  .stage{display:none;}
+  .stage.show{display:grid;}
+  .stage.show.flexcol{display:flex;}
+
+  /* ---------- image-choice stage ---------- */
+  .options{
+    flex:1 1 auto;
+    /* Hard floor: the row may shrink, but never below this. If the
+       frame is too short to honour it, .wrap scrolls instead. */
+    min-height:150px;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:clamp(8px,1.4vw,18px);
+    align-content:stretch;
+  }
+  .opt{
+    background:var(--white);
+    border:3px solid var(--card-gray);
+    border-radius:10px;
+    padding:clamp(6px,1.2vh,14px);
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    min-height:0;
+    overflow:hidden;
+    font-family:var(--font-body);
+    color:var(--psg-navy);
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .opt:hover:not(.locked){
+    border-color:var(--psg-blue);
+    box-shadow:0 4px 14px rgba(12,35,64,.12);
+  }
+  .opt:focus-visible{outline:3px solid var(--psg-blue);outline-offset:3px;}
+  .opt img{
+    flex:1 1 auto;
+    min-height:0;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+  }
+  .opt .label{
+    flex:0 0 auto;
+    font-weight:600;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    font-size:clamp(10px,min(1.2vw,1.7vh),13px);
+    color:#5A6B7D;
+  }
+  .opt.chosen-correct{border-color:var(--correct);background:#F1F8F3;}
+  .opt.chosen-incorrect{border-color:var(--incorrect);background:#FDF3F2;}
+  .opt.dimmed{opacity:.45;}
+  .opt.locked{cursor:default;}
+
+  /* ---------- text-choice stage ---------- */
+  #choice-stage{
+    flex:1 1 auto;
+    flex-direction:column;
+    gap:clamp(8px,1.4vh,16px);
+    min-height:150px;
+  }
+  .statement{
+    flex:1 1 auto;
+    /* Hard floor so it never collapses; ceiling so a one-line
+       statement does not balloon into a mostly empty panel. */
+    min-height:74px;
+    max-height:clamp(92px,28vh,190px);
+    display:flex;
+    align-items:center;
+    background:var(--white);
+    border:3px solid var(--card-gray);
+    border-left:6px solid var(--psg-blue);
+    border-radius:10px;
+    padding:clamp(10px,1.8vh,20px) clamp(12px,1.8vw,22px);
+    font-size:clamp(14px,min(2.1vw,2.9vh),21px);
+    line-height:1.38;
+    overflow:hidden;
+  }
+  .statement.hidden{display:none;}
+  .choicerow{
+    display:grid;
+    gap:clamp(8px,1.4vw,18px);
+  }
+  /* With a statement card above them the buttons are fixed size; with
+     no statement they absorb the leftover height instead. */
+  .choicerow.fixed{flex:0 0 auto;}
+  .choicerow.grow{flex:1 1 auto;min-height:120px;}
+  .ch{
+    background:var(--white);
+    border:3px solid var(--card-gray);
+    border-radius:10px;
+    padding:clamp(9px,1.5vh,15px) clamp(12px,1.6vw,20px);
+    /* Never fall below the 44px touch-target minimum. */
+    min-height:46px;
+    cursor:pointer;
+    font-family:var(--font-head);
+    font-weight:700;
+    font-size:clamp(13px,min(1.7vw,2.3vh),18px);
+    line-height:1.3;
+    color:var(--psg-navy);
+    text-align:center;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  /* Two short category labels read better shouted; a full sentence
+     does not, so only the compact variant gets uppercase. */
+  .ch.compact{letter-spacing:.06em;text-transform:uppercase;}
+  .ch:hover:not(.locked){
+    border-color:var(--psg-blue);
+    box-shadow:0 4px 14px rgba(12,35,64,.12);
+  }
+  .ch:focus-visible{outline:3px solid var(--psg-blue);outline-offset:3px;}
+  .ch.chosen-correct{border-color:var(--correct);background:#F1F8F3;color:var(--correct);}
+  .ch.chosen-incorrect{border-color:var(--incorrect);background:#FDF3F2;color:var(--incorrect);}
+  .ch.dimmed{opacity:.45;}
+  .ch.locked{cursor:default;}
+
+  /* ---------- response block: fixed size, always reserved ---------- */
+  .response{
+    flex:0 0 auto;
+    /* Pin to the bottom so leftover height from a capped statement
+       card falls above the feedback, not below everything. Overridden
+       on narrow screens, where this panel is pinned to the top. */
+    margin-top:auto;
+    display:flex;
+    flex-direction:column;
+    gap:clamp(6px,1.2vh,14px);
+    min-height:clamp(96px,20vh,168px);
+  }
+  .feedback{
+    visibility:hidden;
+    border-left:6px solid var(--psg-blue);
+    background:var(--card-gray);
+    border-radius:6px;
+    padding:clamp(8px,1.4vh,16px) clamp(10px,1.4vw,18px);
+    font-size:clamp(13px,min(1.8vw,2.4vh),18px);
+    line-height:1.45;
+  }
+  .feedback.show{visibility:visible;}
+  .feedback .verdict{
+    font-family:var(--font-head);
+    font-weight:700;
+    display:block;
+    margin-bottom:2px;
+    font-size:1.05em;
+  }
+  .feedback.correct{border-left-color:var(--correct);}
+  .feedback.correct .verdict{color:var(--correct);}
+  .feedback.incorrect{border-left-color:var(--incorrect);}
+  .feedback.incorrect .verdict{color:var(--incorrect);}
+
+  .actions{visibility:hidden;flex:0 0 auto;}
+  .actions.show{visibility:visible;}
+  button.advance{
+    font-family:var(--font-head);
+    font-weight:600;
+    font-size:clamp(13px,min(1.5vw,2vh),15px);
+    color:var(--white);
+    background:var(--psg-blue);
+    border:none;
+    border-radius:6px;
+    padding:clamp(7px,1.2vh,11px) clamp(14px,1.8vw,22px);
+    cursor:pointer;
+  }
+  button.advance:hover{background:#066890;}
+  button.advance:focus-visible{outline:3px solid var(--psg-navy);outline-offset:2px;}
+
+  /* ============================================================
+     NARROW SCREENS (phones, Trainual mobile app)
+     The app clips the frame near 450px and will not scroll inside
+     it, so cap our own layout below the clip and pin the feedback
+     panel to the TOP where it is always reachable.
+     ============================================================ */
+  @media (max-width:700px){
+    .wrap{padding:10px;gap:8px;position:relative;max-height:430px;}
+    .response{
+      position:absolute;
+      top:0;left:0;right:0;
+      margin:0;
+      padding:10px;
+      min-height:0;
+      z-index:5;
+      background:transparent;
+      pointer-events:none;
+    }
+    .response.active{
+      background:var(--page-bg);
+      pointer-events:auto;
+      box-shadow:0 6px 16px rgba(12,35,64,.14);
+      border-radius:0 0 10px 10px;
+    }
+    /* Photos go across rather than stacked: about a third of the height. */
+    .options{gap:6px;min-height:118px;}
+    .opt{padding:5px;border-width:2px;border-radius:8px;gap:3px;}
+    .opt .label{font-size:9px;letter-spacing:.02em;}
+    #choice-stage{min-height:118px;gap:8px;}
+    .choicerow.grow{min-height:104px;}
+    .statement{
+      min-height:66px;
+      font-size:15px;
+      line-height:1.32;
+      padding:10px 12px;
+      border-width:2px;
+      border-left-width:5px;
+    }
+    .ch{padding:9px 8px;border-width:2px;border-radius:8px;font-size:13.5px;min-height:44px;}
+    .rule{margin-bottom:5px;}
+    .feedback{font-size:13px;line-height:1.35;padding:8px 10px;border-left-width:5px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1 id="q-title"></h1>
+    <div class="rule"></div>
+    <p class="progress" id="progress"></p>
+    <p class="prompt" id="q-prompt"></p>
+    <p class="hint" id="q-hint"></p>
+  </div>
+
+  <div class="stage options" id="img-stage" role="group" aria-labelledby="q-prompt"></div>
+
+  <div class="stage flexcol" id="choice-stage" role="group" aria-labelledby="q-prompt">
+    <div class="statement" id="statement"></div>
+    <div class="choicerow" id="choicerow"></div>
+  </div>
+
+  <div class="response">
+    <div class="feedback" id="feedback" role="status" aria-live="polite">
+      <span class="verdict" id="verdict"></span>
+      <span id="explain"></span>
+    </div>
+    <div class="actions" id="actions">
+      <button class="advance" id="advance" type="button">Next</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================================================================
+   EDIT BELOW THIS LINE TO CHANGE THE ACTIVITY
+   ----------------------------------------------------------------
+   Every entry in steps is one screen, shown in this order.
+
+   type "image"   - two or three photos; learner clicks one.
+   type "choice"  - text answer buttons. Add "text" to put a
+                    statement in a card above the buttons (used for
+                    sort-style and true/false items); leave it off
+                    and the buttons fill the space instead.
+
+   In both, set correct:true on the right option, and give every
+   option its own "feedback" line. Keep each to about two lines or
+   it overflows the panel.
+
+   okVerdict / noVerdict are the bold line above the explanation.
+   Vary them so the set does not read as canned.
+   ================================================================ */
+const ACTIVITY = {
+  heading: "Anchor Bolts vs. Direct Bury",
+  steps: [
+
+    {
+      type: "choice",
+      prompt: "Which foundation does this describe?",
+      text: "Involves a template.",
+      okVerdict: "Correct.",
+      noVerdict: "Not quite.",
+      options: [
+        {
+          text: "Anchor bolts",
+          correct: true,
+          feedback: "A template holds the bolts in the exact right spot and perfectly vertical while the concrete is poured around them."
+        },
+        {
+          text: "Direct bury",
+          correct: false,
+          feedback: "Direct bury puts the pole straight into the concrete, so there are no bolts to space out. The template belongs to anchor bolts."
+        }
+      ]
+    },
+
+    {
+      type: "choice",
+      prompt: "Which foundation does this describe?",
+      text: "A kit is sent in advance for installation prior to the pole.",
+      okVerdict: "That's right.",
+      noVerdict: "Not this one.",
+      options: [
+        {
+          text: "Anchor bolts",
+          correct: true,
+          feedback: "The anchor bolt kit goes in days before the sign and pole arrive, so the concrete has time to cure."
+        },
+        {
+          text: "Direct bury",
+          correct: false,
+          feedback: "On a direct bury the pole itself is what goes in the hole, so nothing is sent ahead of it."
+        }
+      ]
+    },
+
+    {
+      type: "choice",
+      prompt: "Which foundation does this describe?",
+      text: "Needs time to cure before the pole can be attached.",
+      okVerdict: "Yes.",
+      noVerdict: "Close, but no.",
+      options: [
+        {
+          text: "Anchor bolts",
+          correct: true,
+          feedback: "The concrete cures first, then the pole is secured to the bolts sticking up out of it. Plan that cure time into the install."
+        },
+        {
+          text: "Direct bury",
+          correct: false,
+          feedback: "On a direct bury the pole is already standing in the hole when the concrete is poured, so it is not attached afterward."
+        }
+      ]
+    },
+
+    {
+      type: "choice",
+      prompt: "Which foundation does this describe?",
+      text: "Needs time to cure before the sign can be installed.",
+      okVerdict: "Exactly.",
+      noVerdict: "Give that one another look.",
+      options: [
+        {
+          text: "Direct bury",
+          correct: true,
+          feedback: "The pole is set plumb and the concrete poured around it. Once it cures, dirt is backfilled and the sign goes up."
+        },
+        {
+          text: "Anchor bolts",
+          correct: false,
+          feedback: "With anchor bolts the cure has to happen before the pole goes on. Here the pole is already in, so the wait is for the sign."
+        }
+      ]
+    },
+
+    {
+      type: "choice",
+      prompt: "Which foundation does this describe?",
+      text: "Typically less expensive.",
+      okVerdict: "Right.",
+      noVerdict: "Worth a second look.",
+      options: [
+        {
+          text: "Direct bury",
+          correct: true,
+          feedback: "Direct bury tends to cost less than anchor bolts. The tradeoff is that replacing the pole means digging up the whole foundation."
+        },
+        {
+          text: "Anchor bolts",
+          correct: false,
+          feedback: "Anchor bolts cost more, but they let you swap out a damaged pole without touching the foundation."
+        }
+      ]
+    },
+
+    {
+      type: "choice",
+      prompt: "A customer hits a directional sign with their car and the pole is bent. Which foundation makes the repair easier?",
+      okVerdict: "Nice work.",
+      noVerdict: "Not quite right.",
+      options: [
+        {
+          text: "Anchor bolts",
+          correct: true,
+          feedback: "Unscrew the damaged pole and sign from the bolts and attach a new one to the existing foundation. This is why directional signs use them."
+        },
+        {
+          text: "Direct bury",
+          correct: false,
+          feedback: "The pole is set in the concrete, so you would have to dig up the entire foundation to put a new one in."
+        }
+      ]
+    }
+
+  ],
+  doneTitle: "That's the set.",
+  doneText: "Anchor bolts use a template and cure before the pole goes on. Direct bury sets the pole in the concrete and costs less.",
+  restartLabel: "Start over"
+};
+/* ================================================================
+   NO EDITS NEEDED BELOW THIS LINE
+   ================================================================ */
+
+(function () {
+  const titleEl   = document.getElementById("q-title");
+  const progEl    = document.getElementById("progress");
+  const promptEl  = document.getElementById("q-prompt");
+  const hintEl    = document.getElementById("q-hint");
+  const imgStage  = document.getElementById("img-stage");
+  const chStage   = document.getElementById("choice-stage");
+  const stateEl   = document.getElementById("statement");
+  const choiceRow = document.getElementById("choicerow");
+  const fb        = document.getElementById("feedback");
+  const verdict   = document.getElementById("verdict");
+  const explain   = document.getElementById("explain");
+  const actions   = document.getElementById("actions");
+  const advance   = document.getElementById("advance");
+  const responseEl = document.querySelector(".response");
+
+  const steps = ACTIVITY.steps;
+  let index = 0;
+  let locked = false;
+  let finished = false;
+  let cards = [];
+
+  titleEl.textContent = ACTIVITY.heading;
+  document.title = ACTIVITY.heading;
+
+  function clearResponse() {
+    fb.className = "feedback";
+    actions.className = "actions";
+    responseEl.classList.remove("active");
+  }
+
+  function buildImageStep(step) {
+    imgStage.innerHTML = "";
+    imgStage.style.gridTemplateColumns = "repeat(" + step.options.length + ",1fr)";
+    cards = step.options.map(function (o) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.setAttribute("aria-label", o.label + ": " + o.alt);
+
+      const img = document.createElement("img");
+      img.src = o.src;
+      img.alt = o.alt;
+
+      const lab = document.createElement("span");
+      lab.className = "label";
+      lab.textContent = o.label;
+
+      b.appendChild(img);
+      b.appendChild(lab);
+      b.addEventListener("click", function () { answer(o, b); });
+      imgStage.appendChild(b);
+      return b;
+    });
+    imgStage.classList.add("show");
+    chStage.classList.remove("show");
+    hintEl.textContent = "Select an image to check your answer.";
+  }
+
+  function buildChoiceStep(step) {
+    const hasText = typeof step.text === "string" && step.text.length > 0;
+    stateEl.textContent = hasText ? step.text : "";
+    stateEl.classList.toggle("hidden", !hasText);
+
+    // Two short labels sit side by side; anything longer stacks so the
+    // text stays readable instead of wrapping into a narrow column.
+    const compact = step.options.every(function (o) { return o.text.length <= 18; });
+    const side = compact && step.options.length === 2;
+    choiceRow.style.gridTemplateColumns = side ? "repeat(2,1fr)" : "1fr";
+    choiceRow.className = "choicerow " + (hasText ? "fixed" : "grow");
+
+    choiceRow.innerHTML = "";
+    cards = step.options.map(function (o) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ch" + (compact ? " compact" : "");
+      b.textContent = o.text;
+      b.addEventListener("click", function () { answer(o, b); });
+      choiceRow.appendChild(b);
+      return b;
+    });
+
+    chStage.classList.add("show");
+    imgStage.classList.remove("show");
+    hintEl.textContent = "Select an answer to check it.";
+  }
+
+  function render() {
+    const step = steps[index];
+    locked = false;
+    progEl.textContent = "Question " + (index + 1) + " of " + steps.length;
+    promptEl.textContent = step.prompt;
+    clearResponse();
+    if (step.type === "image") { buildImageStep(step); } else { buildChoiceStep(step); }
+  }
+
+  function markChoice(chosen, ok) {
+    cards.forEach(function (c) {
+      const base = c.classList.contains("ch") ? "ch" : "opt";
+      const compact = c.classList.contains("compact") ? " compact" : "";
+      c.className = base + compact + " locked" + (c === chosen
+        ? (ok ? " chosen-correct" : " chosen-incorrect")
+        : " dimmed");
+    });
+  }
+
+  function answer(opt, chosen) {
+    if (locked || finished) return;
+    locked = true;
+    const step = steps[index];
+    const ok = opt.correct === true;
+    markChoice(chosen, ok);
+
+    verdict.textContent = ok ? step.okVerdict : step.noVerdict;
+    explain.textContent = opt.feedback;
+    fb.className = "feedback show " + (ok ? "correct" : "incorrect");
+
+    // Wrong answers reset the same question; right answers move on.
+    // One button either way, so it always lands in the same spot.
+    advance.textContent = ok
+      ? (index === steps.length - 1 ? "Finish" : "Next question")
+      : "Try again";
+    advance.dataset.mode = ok ? "next" : "retry";
+    actions.className = "actions show";
+    responseEl.classList.add("active");
+    advance.focus({ preventScroll: true });
+  }
+
+  function onAdvance() {
+    if (finished) { restart(); return; }
+    if (advance.dataset.mode === "retry") { render(); return; }
+    if (index === steps.length - 1) { finish(); return; }
+    index += 1;
+    render();
+  }
+
+  function finish() {
+    finished = true;
+    progEl.textContent = "Complete";
+    promptEl.textContent = "";
+    hintEl.textContent = "";
+    imgStage.classList.remove("show");
+    chStage.classList.add("show");
+    stateEl.classList.remove("hidden");
+    stateEl.textContent = ACTIVITY.doneText;
+    choiceRow.innerHTML = "";
+    choiceRow.className = "choicerow fixed";
+    cards = [];
+    verdict.textContent = ACTIVITY.doneTitle;
+    explain.textContent = "You worked through all " + steps.length + " questions.";
+    fb.className = "feedback show";
+    advance.textContent = ACTIVITY.restartLabel;
+    advance.dataset.mode = "next";
+    actions.className = "actions show";
+    responseEl.classList.add("active");
+    advance.focus({ preventScroll: true });
+  }
+
+  function restart() {
+    finished = false;
+    index = 0;
+    render();
+  }
+
+  advance.addEventListener("click", onAdvance);
+  render();
+})();
+</script>
+</body>
+</html>
